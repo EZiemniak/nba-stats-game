@@ -1,6 +1,7 @@
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import commonplayerinfo, playercareerstats, commonallplayers
 from random import randrange
+from time import sleep
 import json
 import pandas as pd
 
@@ -82,7 +83,8 @@ for p in players_list[:1]:
         
     except Exception as e:
         print(f"Error processing player {p['id']}: {p['full_name']}: {e}")
-    
+    finally:
+        sleep(1)
 # Load cached players list
 #with open("../data/active_players.json") as f1, open("../data/retired_players.json") as f2:
 #    players = json.load(f1) + json.load(f2)
