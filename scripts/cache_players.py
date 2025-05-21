@@ -1,5 +1,5 @@
 from nba_api.stats.static import players
-from nba_api.stats.endpoints import commonplayerinfo, playercareerstats, commonallplayers
+from nba_api.stats.endpoints import commonplayerinfo, playercareerstats, commonallplayers, playerawards
 from random import randrange
 from time import sleep
 import json
@@ -10,6 +10,8 @@ def get_random_player_id():
     rand = randrange(len(players_list) - 1)  
     return players_list[rand]['id']
 
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 1000)
 
 # Make request to get all players 
 # Each player has a unique id, a first name, last name, full name, and currently active status
@@ -78,7 +80,9 @@ for p in players_list[:1]:
         # season by season stats 
         p['season_by_season_stats'] = season_by_season_stats.to_dict(orient='records')
       
-
+        # awards
+        p['awards'] = playerawards.PlayerAwards(player_id=2544).get_dict()
+        
         print(p)
         
     except Exception as e:
