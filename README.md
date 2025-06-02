@@ -36,7 +36,7 @@ Note: G-League/D-League players who have not played in the NBA will cause except
 
 JSON Data Structure
 
-- The `active_players.json` and `retired_players.json` files store player data. See the [JSON schema](/docs/players_schema.md) for the full structure or [JSON sample](/docs/player_sample.json) for sample data for a player.
+- The `active_players.json` and `retired_players.json` files store player data. See the [JSON schema](/docs/players_schema.md) for the full structure or [JSON sample](/docs/sample_player.json) for sample data for a player.
 
 
 

@@ -96,7 +96,7 @@
         //Other seasons are in the same format as above...
       }
     ],
-    // Awards will contain and awards the player has recieved
+    // Awards will contain awards/achievements the player has recieved/achieved
     "awards": {
       "resource": "playerawards",
       "parameters": {
