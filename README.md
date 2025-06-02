@@ -51,18 +51,16 @@ pip install -r requirements.txt
 
 4. Delete all files from data folder. 
 
-Choose setup A (200 player data sample) or setup B (~all players in NBA history)
-5. 
+5. Choose setup A (200 player data sample) or setup B (~all players in NBA history)
 
-A: For a quick sample of the data, run runner.py and terminate once caching begins, allowing for creation of necessary JSON files, as well as logs directory with a log (showing any players excluded from caching). 
 
-B: (Warning: This script takes multiple hours to complete) For data on ~5000 past and present NBA players: Run runner.py. In the data folder, JSON files will be created, then updated upon completion of the program. Logs directory will be created with logs updated during the run (showing any players excluded from the data). If a crash or program termination occurs (e.g loss of connection to API), the data extracted so far is saved. To continue, rerun the program, this will skip any already cached players to avoid duplicated players or data.
+5A: For a quick sample of the data, run runner.py and terminate once caching begins, allowing for creation of necessary JSON files, as well as logs directory with a log (showing any players excluded from caching). 
 
-6. 
+5B: (Warning: This script takes multiple hours to complete) For data on ~5000 past and present NBA players: Run runner.py. In the data folder, JSON files will be created, then updated upon completion of the program. Logs directory will be created with logs updated during the run (showing any players excluded from the data). If a crash or program termination occurs (e.g loss of connection to API), the data extracted so far is saved. To continue, rerun the program, this will skip any already cached players to avoid duplicated players or data. 
 
-A: Run cache_players.py until script completes for a 200 player data sample cached into the data folder. Logs directory will be created with logs updated during the run (showing any players excluded from the data).
+6A: Run cache_players.py until script completes for a 200 player data sample cached into the data folder. Logs directory will be created with logs updated during the run (showing any players excluded from the data).
 
-B: Let the program run for as long as desired. Every segment of players (200 players) cached will update the JSON files with their data. The program can be continued if it is stopped, and it will pick up where it left off on caching player segments.
+6B: Let the program run for as long as desired. Every segment of players (200 players) cached will update the JSON files with their data. The program can be continued if it is stopped, and it will pick up where it left off on caching player segments.
 
 
 Frontend: 
