@@ -1,27 +1,26 @@
 from nba_api.stats.static import players
-from nba_api.stats.endpoints import commonplayerinfo, playercareerstats, commonallplayers, playerawards
-from random import randrange
+from nba_api.stats.endpoints import commonplayerinfo, playercareerstats, playerawards
+from requests.exceptions import HTTPError, ConnectionError, Timeout
 from time import sleep
-import json
+import datetime, json, logging, os, sys
 import pandas as pd
+from tqdm import tqdm
 
-def get_item(val):
-    try:
-        return val.item()
-    except Exception:
-        return None
+CACHE_ACTIVE_ONLY = False  # Set to True to cache only active players, False to cache all players
     
-# Request player info + stats and append to each player
+# Convert a numpy scalar to a native Python type (or return None)
+def get_item(val):
+    return val.item() if hasattr(val, 'item') else None
+    
+# Fetch player info, career stats, season-by-season logs, and awards
 def get_player_info(player):
     player_info = commonplayerinfo.CommonPlayerInfo(player_id=player['id'])
-    sleep(randrange(1, 3))  
     career = playercareerstats.PlayerCareerStats(per_mode36="PerGame", player_id=player['id'])
-    sleep(randrange(1, 3))
     season_by_season_stats = career.get_data_frames()[0]
     career_averages = career.get_data_frames()[1]
     player_info_df = player_info.get_data_frames()[0]
 
-    # general player info
+    # 1) Populate general 'info' sub-dict
     player['info'] = {
       'height': player_info_df['HEIGHT'].values[0],
       'weight': player_info_df['WEIGHT'].values[0],
@@ -46,7 +45,7 @@ def get_player_info(player):
       # all teams played for 
       'teams_list': season_by_season_stats.query('TEAM_ABBREVIATION != "TOT"')['TEAM_ABBREVIATION'].unique().tolist()
     }
-    # career stats and averages
+    # 2) Populate ‘career_stats’ sub-dict
     player['career_stats'] = {
         'games_started': get_item(career_averages['GS'].values[0]),
         'games_played': get_item(career_averages['GP'].values[0]),
@@ -71,40 +70,108 @@ def get_player_info(player):
         'pf': get_item(career_averages['PF'].values[0])
     }
         
-    # season by season stats 
+    # 3) Season-by-season logs 
     player['season_by_season_stats'] = season_by_season_stats.to_dict(orient='records')
       
-    # awards
+    # 4) Awards
     player['awards'] = playerawards.PlayerAwards(player_id=player['id']).get_dict()
-        
-    sleep(randrange(1, 3))
     
-    print(player)
+    if player['is_active']:
+        player['last_updated'] = datetime.datetime.now().isoformat()
+    print(f"Cached player: {player['full_name']} ({player['id']})")
+
     
+# --------------MAIN SCRIPT-------------- 
+# # Can be switched to just active players by calling get_active_players() instead of get_players()
+# # get_inactive_players() is also available for inactive players
 
-pd.set_option('display.max_columns', None)
-pd.set_option('display.width', 1000)
-players_list = players.get_players()
+if __name__ == "__main__":
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.width', 1000)
 
-active_players = []
-retired_players = []
+    max_requests_per_session = 200 # NBA API: ~600 requests/session → 200 players @ 3 calls per player
+    requests_count = 0
 
-for player in players_list:
+    scripts_dir = os.path.dirname(__file__)
+    data_dir = os.path.join(scripts_dir, '../data')
+    logs_dir = os.path.join(scripts_dir, '../logs')
+    log_file = os.path.join(logs_dir, 'cache_players.log')
+
+    active_players_file = os.path.join(data_dir, 'active_players.json')
+    retired_players_file = os.path.join(data_dir, 'retired_players.json')
+    cached_ids_file = os.path.join(data_dir, 'cached_player_ids.json')
+
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO, 
+        format='%(asctime)s - %(levelname)s - %(message)s')
+
+    players_list = players.get_active_players() if CACHE_ACTIVE_ONLY else players.get_players()  
+
     try:
-      get_player_info(player)
-      if player['is_active']:
-          active_players.append(player)
-      else:
-          retired_players.append(player)
+        with open(active_players_file, 'r') as f:
+            active_players = json.load(f)
     except Exception as e:
-        print(f"Error processing player {player['id']}: {player['full_name']}: {e}")
-    finally:
-        sleep(1)
+        print(f'Error: Failed to load active players: {e}\nTry deleting JSON files and run again.')
+        sys.exit(1)   
+    try:
+        with open(retired_players_file, 'r') as f:
+            retired_players = json.load(f)
+    except Exception as e:
+        print(f'Error: Failed to load retired players: {e}\nTry deleting JSON files and run again.')
+        sys.exit(1) 
+    try:
+        with open(cached_ids_file, "r") as f:
+            cached_ids = json.load(f)
+    except Exception as e:
+        print(f'Error: Failed to load cached IDs: {e}\nTry deleting JSON files and run again.')
+        sys.exit(1)
+
+    for player in tqdm(players_list, desc="Caching players"): # Cache segments of players list as testing shows NBA API has a limit of 200 players per run/session, even with large sleep times
+        if requests_count >= max_requests_per_session:
+            print("Max requests per session reached, ending session.")
+            break
+        if player['id'] in cached_ids:
+            print(f"Player {player['full_name']} ({player['id']}) already cached, skipping.")
+            continue
+        try:
+            requests_count += 1
+            get_player_info(player)
+    
+            cached_ids.append(player['id'])
+            if player['is_active']:
+                active_players.append(player)
+            else:
+                retired_players.append(player)
+        except HTTPError as http_err:
+            if http_err.response.status_code == 429:  
+                print("Rate limit exceeded!")
+                sys.exit(1) # Terminate  
+            else:
+                print(f"HTTP error: {http_err}")
+                sys.exit(1) # Terminate
+        except Timeout:
+            print("Request timed out")
+            sys.exit(1) # Terminate
+        except ConnectionError:
+            print("Connection error")
+            sys.exit(1) # Terminate
+        except Exception as e: # Continue on player errors and log the player and error (e.g. G-League players with no NBA games, future rookies with no NBA games yet)
+            print(f"Error processing player {player['id']}: {player['full_name']}: {e}")
+            logging.error(f"Error processing player {player['id']}: {player['full_name']}: {e}")
+            cached_ids.append(player['id'])
+        finally:
+            sleep(1)
 
 
-# Save player lists to json, seperating active and retired players
-with open("../data/active_players.json", "w") as f_active:
-    json.dump(active_players, f_active, indent=2)
-with open("../data/retired_players.json", "w") as f_retired:
-    json.dump(retired_players, f_retired, indent=2)
+    # Save updated player lists and cached IDs list to JSON, separating active and retired players
+    with open(cached_ids_file, "w") as f_ids:
+        json.dump(cached_ids, f_ids)
+    with open(active_players_file, "w") as f_active:
+        json.dump(active_players, f_active, indent=2)
+    with open(retired_players_file, "w") as f_retired:
+        json.dump(retired_players, f_retired, indent=2)
+
+    sys.exit(0)  # Exit successfully
+# End of script
   
