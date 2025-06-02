@@ -7,7 +7,7 @@
     "first_name": "Kyle",
     "last_name": "Lowry",
     "is_active": true,
-    **General Player Info**
+    // General Player Info
     "info": {
       "height": "6-0",
       "weight": "196",
@@ -37,7 +37,7 @@
         "PHI"
       ]
     },
-    **Career stats hold careers averages for the player**
+    // Career stats hold careers averages for the player
     "career_stats": {
       "games_started": 898,
       "games_played": 1173,
@@ -61,7 +61,7 @@
       "ppg": 13.9,
       "pf": 2.7
     },
-    **Season by season stats will contain all seasons played for the player**
+    // Season by season stats will contain all seasons played for the player
     "season_by_season_stats": [    
       {
         "PLAYER_ID": 200768,
@@ -93,9 +93,10 @@
         "PTS": 19.4
       }
       {
-        *Other seasons are in the same format as above...*
+        //Other seasons are in the same format as above...
       }
     ],
+    // Awards will contain and awards the player has recieved
     "awards": {
       "resource": "playerawards",
       "parameters": {
@@ -136,6 +137,9 @@
               "Champion",
               "",
               ""
+            ],
+            [
+              // Other awards are in the same format
             ]
           ]
         }
