@@ -5,22 +5,27 @@ from time import sleep
 import datetime, json, logging, os, sys
 import pandas as pd
 from tqdm import tqdm
-
-CACHE_ACTIVE_ONLY = False  # Set to True to cache only active players, False to cache all players
-    
+from config import ACTIVE_PLAYERS_UPDATE, DATA_DIR, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE, TIME_BETWEEN_UPDATES
+   
 # Convert a numpy scalar to a native Python type (or return None)
 def get_item(val):
     return val.item() if hasattr(val, 'item') else None
     
 # Fetch player info, career stats, season-by-season logs, and awards
-def get_player_info(player):
+def get_player_info(player: dict) -> None:
+
+    if player['is_active']:
+        last_updated = datetime.datetime.fromisoformat(player['last_updated'])
+        print(last_updated)
+        if last_updated > datetime.datetime.now() - TIME_BETWEEN_UPDATES:
+            print(f"Player {player['full_name']} ({player['id']}) is already up-to-date, skipping.")
+            return
     player_info = commonplayerinfo.CommonPlayerInfo(player_id=player['id'])
     career = playercareerstats.PlayerCareerStats(per_mode36="PerGame", player_id=player['id'])
     season_by_season_stats = career.get_data_frames()[0]
     career_averages = career.get_data_frames()[1]
     player_info_df = player_info.get_data_frames()[0]
 
-    # 1) Populate general 'info' sub-dict
     player['info'] = {
       'height': player_info_df['HEIGHT'].values[0],
       'weight': player_info_df['WEIGHT'].values[0],
@@ -41,11 +46,10 @@ def get_player_info(player):
       'roster_status': player_info_df['ROSTERSTATUS'].values[0],
       'greatest_75_flag': player_info_df['GREATEST_75_FLAG'].values[0],
       'nba_flag': player_info_df['NBA_FLAG'].values[0],
-      'dleague_flag': player_info_df['DLEAGUE_FLAG'].values[0],
-      # all teams played for 
+      'dleague_flag': player_info_df['DLEAGUE_FLAG'].values[0], 
       'teams_list': season_by_season_stats.query('TEAM_ABBREVIATION != "TOT"')['TEAM_ABBREVIATION'].unique().tolist()
     }
-    # 2) Populate ‘career_stats’ sub-dict
+
     player['career_stats'] = {
         'games_started': get_item(career_averages['GS'].values[0]),
         'games_played': get_item(career_averages['GP'].values[0]),
@@ -70,10 +74,8 @@ def get_player_info(player):
         'pf': get_item(career_averages['PF'].values[0])
     }
         
-    # 3) Season-by-season logs 
     player['season_by_season_stats'] = season_by_season_stats.to_dict(orient='records')
       
-    # 4) Awards
     player['awards'] = playerawards.PlayerAwards(player_id=player['id']).get_dict()
     
     if player['is_active']:
@@ -82,8 +84,7 @@ def get_player_info(player):
 
     
 # --------------MAIN SCRIPT-------------- 
-# # Can be switched to just active players by calling get_active_players() instead of get_players()
-# # get_inactive_players() is also available for inactive players
+
 
 if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
@@ -92,30 +93,29 @@ if __name__ == "__main__":
     max_requests_per_session = 200 # NBA API: ~600 requests/session → 200 players @ 3 calls per player
     requests_count = 0
 
-    scripts_dir = os.path.dirname(__file__)
-    data_dir = os.path.join(scripts_dir, '../data')
-    logs_dir = os.path.join(scripts_dir, '../logs')
-    log_file = os.path.join(logs_dir, 'cache_players.log')
+    if ACTIVE_PLAYERS_UPDATE:
+        cached_ids_file = os.path.join(DATA_DIR, 'updated_ids.json')
+    else:
+        cached_ids_file = os.path.join(DATA_DIR, 'cached_player_ids.json')
 
-    active_players_file = os.path.join(data_dir, 'active_players.json')
-    retired_players_file = os.path.join(data_dir, 'retired_players.json')
-    cached_ids_file = os.path.join(data_dir, 'cached_player_ids.json')
-
+    log_file = os.path.join(LOGS_DIR, 'cache_players.log')
     logging.basicConfig(
         filename=log_file,
         level=logging.INFO, 
         format='%(asctime)s - %(levelname)s - %(message)s')
 
-    players_list = players.get_active_players() if CACHE_ACTIVE_ONLY else players.get_players()  
+    players_list = players.get_active_players() if ACTIVE_PLAYERS_UPDATE else players.get_players()  
 
     try:
-        with open(active_players_file, 'r') as f:
+        with open(ACTIVE_PLAYERS_FILE, 'r') as f:
             active_players = json.load(f)
+            if ACTIVE_PLAYERS_UPDATE:
+                players_list = active_players
     except Exception as e:
         print(f'Error: Failed to load active players: {e}\nTry deleting JSON files and run again.')
         sys.exit(1)   
     try:
-        with open(retired_players_file, 'r') as f:
+        with open(RETIRED_PLAYERS_FILE, 'r') as f:
             retired_players = json.load(f)
     except Exception as e:
         print(f'Error: Failed to load retired players: {e}\nTry deleting JSON files and run again.')
@@ -146,16 +146,16 @@ if __name__ == "__main__":
         except HTTPError as http_err:
             if http_err.response.status_code == 429:  
                 print("Rate limit exceeded!")
-                sys.exit(1) # Terminate  
+                sys.exit(1)   
             else:
                 print(f"HTTP error: {http_err}")
-                sys.exit(1) # Terminate
+                sys.exit(1)
         except Timeout:
             print("Request timed out")
-            sys.exit(1) # Terminate
+            sys.exit(1) 
         except ConnectionError:
             print("Connection error")
-            sys.exit(1) # Terminate
+            sys.exit(1) 
         except Exception as e: # Continue on player errors and log the player and error (e.g. G-League players with no NBA games, future rookies with no NBA games yet)
             print(f"Error processing player {player['id']}: {player['full_name']}: {e}")
             logging.error(f"Error processing player {player['id']}: {player['full_name']}: {e}")
@@ -167,11 +167,10 @@ if __name__ == "__main__":
     # Save updated player lists and cached IDs list to JSON, separating active and retired players
     with open(cached_ids_file, "w") as f_ids:
         json.dump(cached_ids, f_ids)
-    with open(active_players_file, "w") as f_active:
+    with open(ACTIVE_PLAYERS_FILE, "w") as f_active:
         json.dump(active_players, f_active, indent=2)
-    with open(retired_players_file, "w") as f_retired:
+    with open(RETIRED_PLAYERS_FILE, "w") as f_retired:
         json.dump(retired_players, f_retired, indent=2)
 
     sys.exit(0)  # Exit successfully
-# End of script
   

@@ -24,6 +24,7 @@ NBA API:
     - Awards
 - Through testing, a hard rate limit of ~600 requests per session was found.
 - Since each player requires 3 endpoint calls, there is a limit of 200 players per run to avoid exceeding the session rate limit.
+- Although fetching straight from the API would have likely worked for this project, I wanted to simulate the need to extract and store large amounts of data and host my own API.
 
 Caching:
 
@@ -49,18 +50,15 @@ Caching Script Setup Instructions
 3. Install dependencies
 pip install -r requirements.txt
 
-4. Delete all files from data folder. 
+4. Choose option A (cache new player data) or option B (update active players)
 
-5. Choose setup A (200 player data sample) or setup B (~all players in NBA history)
+5. Skip if you chose Option B, otherwise delete all files from data folder, including both player and ID JSONs. 
 
+6. config.py: Set ACTIVE_PLAYERS_UPDATE to false for Option A, set to true for Option B. For Option B, also set TIME_BETWEEN_UPDATES to datetime.timedelta(seconds=1) to ensure an update happens, or you may set it to your preference and run it according to your set interval between updates.
 
-5A: For a quick sample of the data, run runner.py and terminate once caching begins, allowing for creation of necessary JSON files, as well as logs directory with a log (showing any players excluded from caching). 
-
-5B: (Warning: This script takes multiple hours to complete) For data on ~5000 past and present NBA players: Run runner.py. In the data folder, JSON files will be created, then updated upon completion of the program. Logs directory will be created with logs updated during the run (showing any players excluded from the data). If a crash or program termination occurs (e.g loss of connection to API), the data extracted so far is saved. To continue, rerun the program, this will skip any already cached players to avoid duplicated players or data. 
-
-6A: Run cache_players.py until script completes for a 200 player data sample cached into the data folder. Logs directory will be created with logs updated during the run (showing any players excluded from the data).
-
-6B: Let the program run for as long as desired. Every segment of players (200 players) cached will update the JSON files with their data. The program can be continued if it is stopped, and it will pick up where it left off on caching player segments.
+7.  - Run runner.py, which executes cache_players.py as a subprocess in a loop to avoid session rate limits. Every successful execution of the subprocess fetches a 200 player chunk and caches it to JSON. 
+    - Terminating between executions of the subprocess will allow you to see the cached data in the data folder. 
+    - To continue caching where you left off, just start runner.py again, which will complete when either all active NBA players have been updated (option B) or all players who have ever played in an NBA game is cached (option A) (Option A takes multiple hours to cache ~5000 players).
 
 
 Frontend: 
