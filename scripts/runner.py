@@ -22,8 +22,13 @@ def ensure_directories() -> None:
     # Initialize files with empty lists if they don't exist yet
     for file in [cached_ids_file, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE]:
         if not os.path.exists(file):
-            with open(file, 'w') as f_init:
-                json.dump([], f_init)
+            try:
+                with open(file, 'w') as f_init:
+                    json.dump([], f_init)
+            except Exception as e:
+                print(f"Error while ensuring log directory and JSON files: {e}")
+                sys.exit(1)
+
 
 # --------------MAIN SCRIPT-------------- 
 # Run cache_players.py as a subprocess (to avoid per session rate limits) until all players are cached (update active players cache or create new caches) 
@@ -41,11 +46,10 @@ if __name__ == "__main__":
     while runs < max_runs:
         runs += 1
         print(f'Attempt {runs} of {max_runs} to cache players segments...')
-        cached_ids = set(load_cached_ids())
+        cached_ids = load_cached_ids()
         players_list = players.get_active_players() if ACTIVE_PLAYERS_UPDATE else players.get_players()
-        full_id_list = set(p['id'] for p in players_list)
-        remaining_ids = full_id_list - cached_ids
-        print(f'{len(cached_ids)} / {len(full_id_list)} players cached. {len(remaining_ids)} remaining.')
+        remaining_ids = len(players_list) - len(cached_ids)
+        print(f'{len(cached_ids)} / {len(players_list)} players cached. {remaining_ids} remaining.')
     
         if not remaining_ids:
             print("All player IDs are cached.")
@@ -60,8 +64,12 @@ if __name__ == "__main__":
     
     # Reset updated IDs so next run can update again (future improvement: github actions scheduling)
     if ACTIVE_PLAYERS_UPDATE:
-        with open(cached_ids_file, 'w') as f_reset:
-            json.dump([], f_reset)
+        try:
+            with open(cached_ids_file, 'w') as f_reset:
+                json.dump([], f_reset)
+        except Exception as e:
+            print(f'Error: Failed to reset updated IDs: {e}\nTry deleting updated_ids.json and running again.')
+            sys.exit(1)
 
     print("All runs completed. Exiting.")
 

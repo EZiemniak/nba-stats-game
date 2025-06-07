@@ -50,15 +50,17 @@ Caching Script Setup Instructions
 3. Install dependencies
 pip install -r requirements.txt
 
-4. Choose option A (cache new player data) or option B (update active players)
+    Update Active Players:
 
-5. Skip if you chose Option B, otherwise delete all files from data folder, including both player and ID JSONs. 
+    1. Set ACTIVE_PLAYERS_UPDATE to true in config.py.
+    2. Run runner.py. This will take approximately 15 minutes. After every 200 players, those players are cached to JSON, even if the program terminates. So, you may stop the program and continue caching where you left off by starting runner.py again, and no duplicate players will be cached.
+    3. Recently updated players will not be updated again. You may change how recent the update must be by setting TIME_BETWEEN_UPDATES in config.py (e.g. to ensure every player is updated every time the script runs, you may set TIME_BETWEEN_UPDATES to timedelta(seconds=1)).
 
-6. config.py: Set ACTIVE_PLAYERS_UPDATE to false for Option A, set to true for Option B. For Option B, also set TIME_BETWEEN_UPDATES to datetime.timedelta(seconds=1) to ensure an update happens, or you may set it to your preference and run it according to your set interval between updates.
+    Cache New Data:
 
-7.  - Run runner.py, which executes cache_players.py as a subprocess in a loop to avoid session rate limits. Every successful execution of the subprocess fetches a 200 player chunk and caches it to JSON. 
-    - Terminating between executions of the subprocess will allow you to see the cached data in the data folder. 
-    - To continue caching where you left off, just start runner.py again, which will complete when either all active NBA players have been updated (option B) or all players who have ever played in an NBA game is cached (option A) (Option A takes multiple hours to cache ~5000 players).
+    1. Set ACTIVE_PLAYERS_UPDATE to false in config.py.
+    2. Delete all files from data folder. 
+    3. Run runner.py. Caching process takes approximately 2 hours to complete. After every 200 players, those players are cached to JSON, even if the program terminates. So, you may stop the program and continue caching where you left off by starting runner.py again, and no duplicate players will be cached.
 
 
 Frontend: 

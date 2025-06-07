@@ -7,16 +7,14 @@ import pandas as pd
 from tqdm import tqdm
 from config import ACTIVE_PLAYERS_UPDATE, DATA_DIR, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE, TIME_BETWEEN_UPDATES
    
-# Convert a numpy scalar to a native Python type (or return None)
 def get_item(val):
     return val.item() if hasattr(val, 'item') else None
     
 # Fetch player info, career stats, season-by-season logs, and awards
 def get_player_info(player: dict) -> None:
 
-    if player['is_active']:
+    if player['is_active'] and ACTIVE_PLAYERS_UPDATE:
         last_updated = datetime.datetime.fromisoformat(player['last_updated'])
-        print(last_updated)
         if last_updated > datetime.datetime.now() - TIME_BETWEEN_UPDATES:
             print(f"Player {player['full_name']} ({player['id']}) is already up-to-date, skipping.")
             return
@@ -84,7 +82,9 @@ def get_player_info(player: dict) -> None:
 
     
 # --------------MAIN SCRIPT-------------- 
-
+# Loads cached IDs and players from JSON (active only, or all players, dependant on ACTIVE_PLAYERS_UPDATE)
+# For players not in cache (or active + not updated, if ACTIVE_PLAYERS_UPDATE is true), fetches their info, career stats, season-by-season logs, and awards (and a timestamp if its an update)
+# After reaching API rate limit for this session, stores fetched players and IDs in JSON cache files
 
 if __name__ == "__main__":
     pd.set_option('display.max_columns', None)
@@ -104,19 +104,23 @@ if __name__ == "__main__":
         level=logging.INFO, 
         format='%(asctime)s - %(levelname)s - %(message)s')
 
-    players_list = players.get_active_players() if ACTIVE_PLAYERS_UPDATE else players.get_players()  
-
     try:
-        with open(ACTIVE_PLAYERS_FILE, 'r') as f:
+        with open(ACTIVE_PLAYERS_FILE, 'r', encoding='utf-8') as f:
             active_players = json.load(f)
             if ACTIVE_PLAYERS_UPDATE:
                 players_list = active_players
+            else:
+                players_list = players.get_players()
     except Exception as e:
         print(f'Error: Failed to load active players: {e}\nTry deleting JSON files and run again.')
         sys.exit(1)   
+    if len(players_list) < 300:
+        print(f'Only {len(players_list)} players found, try setting ACTIVE_PLAYERS_UPDATE to False in config.py to cache all players first.')
+        sys.exit(1)
     try:
-        with open(RETIRED_PLAYERS_FILE, 'r') as f:
-            retired_players = json.load(f)
+        if not ACTIVE_PLAYERS_UPDATE:
+            with open(RETIRED_PLAYERS_FILE, 'r', encoding='utf-8') as f:
+                retired_players = json.load(f)
     except Exception as e:
         print(f'Error: Failed to load retired players: {e}\nTry deleting JSON files and run again.')
         sys.exit(1) 
@@ -127,7 +131,9 @@ if __name__ == "__main__":
         print(f'Error: Failed to load cached IDs: {e}\nTry deleting JSON files and run again.')
         sys.exit(1)
 
-    for player in tqdm(players_list, desc="Caching players"): # Cache segments of players list as testing shows NBA API has a limit of 200 players per run/session, even with large sleep times
+    cache_load = tqdm(players_list, desc="Caching players") if not ACTIVE_PLAYERS_UPDATE else players_list
+    
+    for player in cache_load: # Cache segments of players list as testing shows NBA API has a limit of 200 players per run/session, even with large sleep times
         if requests_count >= max_requests_per_session:
             print("Max requests per session reached, ending session.")
             break
@@ -136,13 +142,20 @@ if __name__ == "__main__":
             continue
         try:
             requests_count += 1
+
+            if ACTIVE_PLAYERS_UPDATE:
+                print(f"{requests_count} / {max_requests_per_session} players")
+    
             get_player_info(player)
     
             cached_ids.append(player['id'])
-            if player['is_active']:
+            if not player['is_active']:
+                retired_players.append(player)
+            elif player['is_active'] and ACTIVE_PLAYERS_UPDATE:
+                active_players = [p for p in active_players if p['id'] != player['id']]  
                 active_players.append(player)
             else:
-                retired_players.append(player)
+                active_players.append(player)
         except HTTPError as http_err:
             if http_err.response.status_code == 429:  
                 print("Rate limit exceeded!")
@@ -163,14 +176,18 @@ if __name__ == "__main__":
         finally:
             sleep(1)
 
-
-    # Save updated player lists and cached IDs list to JSON, separating active and retired players
-    with open(cached_ids_file, "w") as f_ids:
-        json.dump(cached_ids, f_ids)
-    with open(ACTIVE_PLAYERS_FILE, "w") as f_active:
-        json.dump(active_players, f_active, indent=2)
-    with open(RETIRED_PLAYERS_FILE, "w") as f_retired:
-        json.dump(retired_players, f_retired, indent=2)
+    try:
+        # Save updated player lists and cached IDs list to JSON, separating active and retired players
+        with open(cached_ids_file, "w") as f_ids:
+            json.dump(cached_ids, f_ids)
+        with open(ACTIVE_PLAYERS_FILE, "w", encoding='utf-8') as f_active:
+            json.dump(active_players, f_active, ensure_ascii=False, indent=2)
+        if not ACTIVE_PLAYERS_UPDATE:
+            with open(RETIRED_PLAYERS_FILE, "w", encoding='utf-8') as f_retired:
+                json.dump(retired_players, f_retired, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f'Error: Failed to save cached IDs or player lists: {e}\nTry deleting JSON files and run again.')
+        sys.exit(1)
 
     sys.exit(0)  # Exit successfully
   
