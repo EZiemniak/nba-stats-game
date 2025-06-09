@@ -109,6 +109,8 @@ if __name__ == "__main__":
             active_players = json.load(f)
             if ACTIVE_PLAYERS_UPDATE:
                 players_list = active_players
+                # Dict to quickly access players by ID for updates
+                player_dict = {p['id']: p for p in players_list}
             else:
                 players_list = players.get_players()
     except Exception as e:
@@ -149,11 +151,11 @@ if __name__ == "__main__":
             get_player_info(player)
     
             cached_ids.append(player['id'])
+
             if not player['is_active']:
                 retired_players.append(player)
             elif player['is_active'] and ACTIVE_PLAYERS_UPDATE:
-                active_players = [p for p in active_players if p['id'] != player['id']]  
-                active_players.append(player)
+                player_dict[player['id']] = player
             else:
                 active_players.append(player)
         except HTTPError as http_err:
@@ -177,6 +179,8 @@ if __name__ == "__main__":
             sleep(1)
 
     try:
+        if ACTIVE_PLAYERS_UPDATE:
+            active_players = list(player_dict.values())
         # Save updated player lists and cached IDs list to JSON, separating active and retired players
         with open(cached_ids_file, "w") as f_ids:
             json.dump(cached_ids, f_ids)
