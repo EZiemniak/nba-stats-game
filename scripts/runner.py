@@ -42,10 +42,18 @@ if __name__ == "__main__":
     if not os.path.exists(script_path):
         print(f"Error: {script_path} does not exist.")
         sys.exit(1)
-
+    
+    previous_remaining_ids = 0
+    remaining_ids = 1 # Init to 1 to not break loop on first run
+    
     while runs < max_runs:
+        if remaining_ids == previous_remaining_ids:
+            print(f"No new players to cache. Exiting after {runs} runs.")
+            break
+
         runs += 1
         print(f'Attempt {runs} of {max_runs} to cache players segments...')
+        
         cached_ids = load_cached_ids()
         players_list = players.get_active_players() if ACTIVE_PLAYERS_UPDATE else players.get_players()
         remaining_ids = len(players_list) - len(cached_ids)
@@ -54,7 +62,8 @@ if __name__ == "__main__":
         if not remaining_ids:
             print("All player IDs are cached.")
             break
-           
+        
+        previous_remaining_ids = remaining_ids
         # Run the caching script in a subprocess, so each process gets its own rate limit, on current python interpreter
         try:
             result = subprocess.run([sys.executable, script_path], check=True) # check=True raises exception if process fails
