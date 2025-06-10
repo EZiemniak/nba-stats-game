@@ -2,7 +2,8 @@ from nba_api.stats.static import players
 from nba_api.stats.endpoints import commonplayerinfo, playercareerstats, playerawards
 from requests.exceptions import HTTPError, ConnectionError, Timeout
 from time import sleep
-import datetime, json, logging, os, sys
+from datetime import datetime, timezone
+import json, logging, os, sys
 import pandas as pd
 from tqdm import tqdm
 from config import ACTIVE_PLAYERS_UPDATE, DATA_DIR, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE, TIME_BETWEEN_UPDATES
@@ -14,8 +15,8 @@ def get_item(val):
 def get_player_info(player: dict) -> None:
 
     if player['is_active'] and ACTIVE_PLAYERS_UPDATE:
-        last_updated = datetime.datetime.fromisoformat(player['last_updated'])
-        if last_updated > datetime.datetime.now() - TIME_BETWEEN_UPDATES:
+        last_updated = datetime.fromisoformat(player['last_updated'])
+        if last_updated > datetime.now(timezone.utc) - TIME_BETWEEN_UPDATES:
             print(f"Player {player['full_name']} ({player['id']}) is already up-to-date, skipping.")
             return
     player_info = commonplayerinfo.CommonPlayerInfo(player_id=player['id'])
@@ -77,7 +78,7 @@ def get_player_info(player: dict) -> None:
     player['awards'] = playerawards.PlayerAwards(player_id=player['id']).get_dict()
     
     if player['is_active']:
-        player['last_updated'] = datetime.datetime.now().isoformat()
+        player['last_updated'] = datetime.now(timezone.utc).isoformat()
     print(f"Cached player: {player['full_name']} ({player['id']})")
 
     
