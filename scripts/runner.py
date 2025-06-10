@@ -1,4 +1,4 @@
-import json, time, os, subprocess, sys
+import json, os, subprocess, sys
 from nba_api.stats.static import players
 from config import ACTIVE_PLAYERS_UPDATE, SCRIPTS_DIR, DATA_DIR, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE
 
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     
     previous_remaining_ids = 0
     remaining_ids = 1 # Init to 1 to not break loop on first run
-    
+
     while runs < max_runs:
         if remaining_ids == previous_remaining_ids:
             print(f"No new players to cache. Exiting after {runs} runs.")
