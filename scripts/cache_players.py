@@ -15,7 +15,12 @@ def get_item(val):
 def get_player_info(player: dict) -> None:
 
     if player['is_active'] and ACTIVE_PLAYERS_UPDATE:
-        last_updated = datetime.fromisoformat(player['last_updated'])
+        try:
+            last_updated = datetime.fromisoformat(player['last_updated'])
+        except KeyError as e:
+            print(f"Player {player['full_name']} ({player['id']}) has no last_updated field.")
+            logging.info(f"Player {player['full_name']} ({player['id']}) has no last_updated field: {e}")
+            last_updated = datetime.now(timezone.utc)
         if last_updated > datetime.now(timezone.utc) - TIME_BETWEEN_UPDATES:
             print(f"Player {player['full_name']} ({player['id']}) is already up-to-date, skipping.")
             return
@@ -165,11 +170,15 @@ if __name__ == "__main__":
                     print("Max timeouts reached, ending script.")
                     logging.error(f"{attempt + 1} timeouts for player {player['id']}: {player['full_name']}")
                     sys.exit(1)
-            except Exception as e: # Continue on player errors and log the player and error (e.g. G-League players with no NBA games, future rookies with no NBA games yet)
-                print(f"Error processing player {player['id']}: {player['full_name']}: {type(e)} : {e}")
-                logging.error(f"Error processing player {player['id']}: {player['full_name']}: {type(e)} : {e}")
+            except IndexError as e: # Continue on player stat errors and log the player and error (e.g. G-League players with no NBA games, future rookies with no NBA games yet)
+                print(f"Unable to process player (likely has no NBA games played) {player['id']}: {player['full_name']}: {e}")
+                logging.info(f"Unable to process player (likely has no NBA games played) {player['id']}: {player['full_name']} : {e}")
                 success = True  # Marked as logged and handled  
                 break
+            except Exception as e:
+                print(f"Unexpected error processing player {player['id']}: {player['full_name']}: {e}")
+                logging.error(f"Unexpected error processing player {player['id']}: {player['full_name']}: {e}")
+                sys.exit(1)
             
         if success:
             cached_ids.append(player['id']) 
