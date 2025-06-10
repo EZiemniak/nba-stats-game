@@ -134,7 +134,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     cache_load = tqdm(players_list, desc="Caching players") if not ACTIVE_PLAYERS_UPDATE else players_list
-    
+
     for player in cache_load: # Cache segments of players list as testing shows NBA API has a limit of 200 players per run/session, even with large sleep times
         if requests_count >= max_requests_per_session:
             print("Max requests per session reached, ending session.")
@@ -142,15 +142,36 @@ if __name__ == "__main__":
         if player['id'] in cached_ids:
             print(f"Player {player['full_name']} ({player['id']}) already cached, skipping.")
             continue
-        try:
-            requests_count += 1
 
-            if ACTIVE_PLAYERS_UPDATE:
-                print(f"{requests_count} / {max_requests_per_session} players")
+        success = False
+        for attempt in range(3): # Up to 3 retries on timeouts
+            try:
+                requests_count += 1
+
+                if ACTIVE_PLAYERS_UPDATE:
+                    print(f"{requests_count} / {max_requests_per_session} players")
     
-            get_player_info(player)
-    
-            cached_ids.append(player['id'])
+                get_player_info(player)
+
+                success = True
+                break
+
+            except Timeout:
+                if attempt < 2:
+                    print("Request timed out")
+                    sleep(10)
+                else:
+                    print("Max timeouts reached, ending script.")
+                    logging.error(f"{attempt + 1} timeouts for player {player['id']}: {player['full_name']}")
+                    sys.exit(1)
+            except Exception as e: # Continue on player errors and log the player and error (e.g. G-League players with no NBA games, future rookies with no NBA games yet)
+                print(f"Error processing player {player['id']}: {player['full_name']}: {type(e)} : {e}")
+                logging.error(f"Error processing player {player['id']}: {player['full_name']}: {type(e)} : {e}")
+                success = True  # Marked as logged and handled  
+                break
+            
+        if success:
+            cached_ids.append(player['id']) 
 
             if not player['is_active']:
                 retired_players.append(player)
@@ -158,25 +179,8 @@ if __name__ == "__main__":
                 player_dict[player['id']] = player
             else:
                 active_players.append(player)
-        except HTTPError as http_err:
-            if http_err.response.status_code == 429:  
-                print("Rate limit exceeded!")
-                sys.exit(1)   
-            else:
-                print(f"HTTP error: {http_err}")
-                sys.exit(1)
-        except Timeout:
-            print("Request timed out")
-            sys.exit(1) 
-        except ConnectionError:
-            print("Connection error")
-            sys.exit(1) 
-        except Exception as e: # Continue on player errors and log the player and error (e.g. G-League players with no NBA games, future rookies with no NBA games yet)
-            print(f"Error processing player {player['id']}: {player['full_name']}: {e}")
-            logging.error(f"Error processing player {player['id']}: {player['full_name']}: {e}")
-            cached_ids.append(player['id'])
-        finally:
-            sleep(1)
+        
+        sleep(1)
 
     try:
         if ACTIVE_PLAYERS_UPDATE:
