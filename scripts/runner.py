@@ -44,13 +44,8 @@ if __name__ == "__main__":
         sys.exit(1)
     
     previous_remaining_ids = 0
-    remaining_ids = 1 # Init to 1 to not break loop on first run
 
     while runs < max_runs:
-        if remaining_ids == previous_remaining_ids:
-            print(f"No new players to cache. Exiting after {runs} runs.")
-            break
-
         runs += 1
         print(f'Attempt {runs} of {max_runs} to cache players segments...')
         
@@ -58,7 +53,10 @@ if __name__ == "__main__":
         players_list = players.get_active_players() if ACTIVE_PLAYERS_UPDATE else players.get_players()
         remaining_ids = len(players_list) - len(cached_ids)
         print(f'{len(cached_ids)} / {len(players_list)} players cached. {remaining_ids} remaining.')
-    
+        if remaining_ids == previous_remaining_ids:
+            print(f'{remaining_ids} players remaining, but no new players to cache. Exiting after {runs} runs.')
+            print(f"No new players to cache. Exiting after {runs} runs.")
+            break
         if not remaining_ids:
             print("All player IDs are cached.")
             break
