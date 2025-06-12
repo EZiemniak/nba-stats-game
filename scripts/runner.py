@@ -1,15 +1,10 @@
 import json, os, subprocess, sys
 from nba_api.stats.static import players
-from config import ACTIVE_PLAYERS_UPDATE, SCRIPTS_DIR, DATA_DIR, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE
-
-if ACTIVE_PLAYERS_UPDATE:
-    cached_ids_file = os.path.join(DATA_DIR, 'updated_ids.json')
-else:
-    cached_ids_file = os.path.join(DATA_DIR, 'cached_player_ids.json')
+from config import ACTIVE_PLAYERS_UPDATE, SCRIPTS_DIR, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE, CACHED_IDS_FILE
 
 def load_cached_ids() -> list:
     try:
-        with open(cached_ids_file, "r") as f:
+        with open(CACHED_IDS_FILE, "r") as f:
             return json.load(f)
     except Exception as e:
         print(f'Error: Failed to load cached IDs: {e}\nTry deleting cached_player_ids.json and running again.')
@@ -20,7 +15,7 @@ def ensure_directories() -> None:
     os.makedirs(LOGS_DIR, exist_ok=True)
 
     # Initialize files with empty lists if they don't exist yet
-    for file in [cached_ids_file, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE]:
+    for file in [CACHED_IDS_FILE, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE]:
         if not os.path.exists(file):
             try:
                 with open(file, 'w') as f_init:
@@ -72,7 +67,7 @@ if __name__ == "__main__":
     # Reset updated IDs so next run can update again (future improvement: github actions scheduling)
     if ACTIVE_PLAYERS_UPDATE:
         try:
-            with open(cached_ids_file, 'w') as f_reset:
+            with open(CACHED_IDS_FILE, 'w') as f_reset:
                 json.dump([], f_reset)
         except Exception as e:
             print(f'Error: Failed to reset updated IDs: {e}\nTry deleting updated_ids.json and running again.')

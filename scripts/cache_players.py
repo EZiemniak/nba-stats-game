@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import json, logging, os, sys
 import pandas as pd
 from tqdm import tqdm
-from config import ACTIVE_PLAYERS_UPDATE, DATA_DIR, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE, TIME_BETWEEN_UPDATES
+from config import ACTIVE_PLAYERS_UPDATE, LOGS_DIR, ACTIVE_PLAYERS_FILE, RETIRED_PLAYERS_FILE, CACHED_IDS_FILE, TIME_BETWEEN_UPDATES
    
 def get_item(val):
     return val.item() if hasattr(val, 'item') else None
@@ -99,11 +99,6 @@ if __name__ == "__main__":
     max_requests_per_session = 200 # NBA API: ~600 requests/session → 200 players @ 3 calls per player
     requests_count = 0
 
-    if ACTIVE_PLAYERS_UPDATE:
-        cached_ids_file = os.path.join(DATA_DIR, 'updated_ids.json')
-    else:
-        cached_ids_file = os.path.join(DATA_DIR, 'cached_player_ids.json')
-
     log_file = os.path.join(LOGS_DIR, 'cache_players.log')
     logging.basicConfig(
         filename=log_file,
@@ -133,7 +128,7 @@ if __name__ == "__main__":
         print(f'Error: Failed to load retired players: {e}\nTry deleting JSON files and run again.')
         sys.exit(1) 
     try:
-        with open(cached_ids_file, "r") as f:
+        with open(CACHED_IDS_FILE, "r") as f:
             cached_ids = json.load(f)
     except Exception as e:
         print(f'Error: Failed to load cached IDs: {e}\nTry deleting JSON files and run again.')
@@ -196,7 +191,7 @@ if __name__ == "__main__":
         if ACTIVE_PLAYERS_UPDATE:
             active_players = list(player_dict.values())
         # Save updated player lists and cached IDs list to JSON, separating active and retired players
-        with open(cached_ids_file, "w") as f_ids:
+        with open(CACHED_IDS_FILE, "w") as f_ids:
             json.dump(cached_ids, f_ids)
         with open(ACTIVE_PLAYERS_FILE, "w", encoding='utf-8') as f_active:
             json.dump(active_players, f_active, ensure_ascii=False, indent=2)
